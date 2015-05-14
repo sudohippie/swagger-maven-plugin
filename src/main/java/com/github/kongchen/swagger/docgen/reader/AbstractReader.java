@@ -5,6 +5,8 @@ import com.github.kongchen.swagger.docgen.jaxrs.BeanParamExtention;
 import com.github.kongchen.swagger.docgen.jaxrs.JaxrsParameterExtension;
 import com.github.kongchen.swagger.docgen.spring.SpringSwaggerExtension;
 import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiImplicitParam;
+import com.wordnik.swagger.annotations.ApiImplicitParams;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import com.wordnik.swagger.annotations.ApiResponse;
@@ -25,13 +27,20 @@ import com.wordnik.swagger.models.Scheme;
 import com.wordnik.swagger.models.SecurityRequirement;
 import com.wordnik.swagger.models.Swagger;
 import com.wordnik.swagger.models.Tag;
+import com.wordnik.swagger.models.parameters.BodyParameter;
+import com.wordnik.swagger.models.parameters.FormParameter;
+import com.wordnik.swagger.models.parameters.HeaderParameter;
 import com.wordnik.swagger.models.parameters.Parameter;
+import com.wordnik.swagger.models.parameters.PathParameter;
+import com.wordnik.swagger.models.parameters.QueryParameter;
 import com.wordnik.swagger.models.properties.ArrayProperty;
 import com.wordnik.swagger.models.properties.MapProperty;
 import com.wordnik.swagger.models.properties.Property;
 import com.wordnik.swagger.models.properties.RefProperty;
+import com.wordnik.swagger.models.properties.StringProperty;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -43,6 +52,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.core.annotation.AnnotationUtils;
 
 /**
  * Created by chekong on 15/4/28.
@@ -336,6 +346,75 @@ public abstract class AbstractReader {
         }
         return parameters;
     }
+    
+    protected List<Parameter> getParametersFromApiImplicitParams(Method method){
+        
+        List<Parameter> parameters = new ArrayList<Parameter>();
+        
+        // Process @ApiImplicitParams
+        Annotation paramsAnnotation = AnnotationUtils.getAnnotation(method, ApiImplicitParams.class);
+        if (paramsAnnotation != null && (paramsAnnotation instanceof ApiImplicitParams)) {
+            ApiImplicitParams apiImplicitParamsAnnotation = (ApiImplicitParams) paramsAnnotation;
+            for (ApiImplicitParam apiImplicitParam : apiImplicitParamsAnnotation.value()) {
+                String paramType = apiImplicitParam.paramType();
+
+                // TODO: Refine and refactor the following into a cleaner factory pattern
+                
+                if ("header".equals(paramType)) {
+                    HeaderParameter parameter = new HeaderParameter();
+                    parameter.setDefaultValue(apiImplicitParam.defaultValue());
+                    parameter.setName(apiImplicitParam.name());
+                    parameter.setRequired(apiImplicitParam.required());
+                    if (apiImplicitParam.allowMultiple()) {
+                        parameter.setArray(true);
+                        parameter.setItems(new StringProperty()); // TODO: determine correct Property
+                    }
+                    parameters.add(parameter);
+
+                } else if ("path".equals(paramType)) {
+                    PathParameter parameter = new PathParameter();
+                    parameter.setDefaultValue(apiImplicitParam.defaultValue());
+                    parameter.setName(apiImplicitParam.name());
+                    parameter.setType(apiImplicitParam.dataType());
+                    parameter.setRequired(apiImplicitParam.required());
+                    parameters.add(parameter);
+
+                } else if ("query".equals(paramType)) {
+                    QueryParameter parameter = new QueryParameter();
+                    parameter.setDefaultValue(apiImplicitParam.defaultValue());
+                    parameter.setName(apiImplicitParam.name());
+                    parameter.setType(apiImplicitParam.dataType());
+                    parameter.setRequired(apiImplicitParam.required());
+                    if (apiImplicitParam.allowMultiple()) {
+                        parameter.setArray(true);
+                        parameter.setItems(new StringProperty()); // TODO: determine correct Property
+                    }
+                    parameters.add(parameter);
+
+                } else if ("body".equals(paramType)) {
+                    BodyParameter parameter = new BodyParameter();
+                    parameter.setName(apiImplicitParam.name());
+                    parameter.setRequired(apiImplicitParam.required());
+                    // TODO: Determine body param schema
+                    parameters.add(parameter);
+
+                } else if ("form".equals(paramType)) {
+                    FormParameter parameter = new FormParameter();
+                    parameter.setDefaultValue(apiImplicitParam.defaultValue());
+                    parameter.setName(apiImplicitParam.name());
+                    parameter.setType(apiImplicitParam.dataType());
+                    parameter.setRequired(apiImplicitParam.required());
+                    if (apiImplicitParam.allowMultiple()) {
+                        parameter.setArray(true);
+                        parameter.setItems(new StringProperty()); // TODO: determine correct Property
+                    }
+                    parameters.add(parameter);
+                }
+            }
+        }
+        
+        return parameters;
+    } 
 
     protected void updateApiResponse(Operation operation, ApiResponses responseAnnotation) {
         Class<?> responseClass;
